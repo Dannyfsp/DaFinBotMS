@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -49,4 +50,29 @@ func GetCollection(dbName, collectionName string) (*mongo.Collection, error) {
 
 	collection := Client.Database(dbName).Collection(collectionName)
 	return collection, nil
+}
+
+func CreateCollections() error {
+	collections := []string{"users", "admin", "user_profiles", "wallet"}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	existingCollections, err := Client.Database("finbotms").ListCollectionNames(ctx, bson.D{})
+	if err != nil {
+		return err
+	}
+
+	existingCollectionsMap := make(map[string]bool)
+	for _, name := range existingCollections {
+		existingCollectionsMap[name] = true
+	}
+
+	for _, collection := range collections {
+		if _, exists := existingCollectionsMap[collection]; !exists {
+			if err := Client.Database("finbotms").CreateCollection(ctx, collection); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

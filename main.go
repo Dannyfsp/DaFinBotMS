@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/Dannyfsp/DaFinBotMS/database"
+	"github.com/Dannyfsp/DaFinBotMS/middleware"
+	"github.com/Dannyfsp/DaFinBotMS/routes"
 	"github.com/joho/godotenv"
 )
 
@@ -32,18 +34,28 @@ func main() {
 		}
 	}()
 
-	mux := http.NewServeMux()
+	if err := database.CreateCollections(); err != nil {
+		log.Fatalf("Failed to create collections: %v", err)
+	}
 
-	mux.HandleFunc("GET /healthz", func(res http.ResponseWriter, req *http.Request) {
-		fmt.Fprintf(res, "Server is Up and running")
-	})
+	router := http.NewServeMux()
 
-	mux.HandleFunc("/{$}", func(res http.ResponseWriter, req *http.Request) {
-		fmt.Fprintf(res, "404 Not Found")
-	})
+	routes.LoadRoutes(router)
 
-	fmt.Println("Server is running on port 8080...")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	stack := middleware.CreateStack(
+		middleware.LoggingMiddleware,
+		middleware.CorsMiddleware,
+	)
+
+	port := os.Getenv("PORT")
+
+	server := http.Server{
+		Addr:    port,
+		Handler: stack(router),
+	}
+
+	fmt.Println("Server is running on port", port)
+	if err := server.ListenAndServe(); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
 }
